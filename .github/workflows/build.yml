@@ -12,6 +12,7 @@ on:
 
 permissions:
   contents: write
+  workflows: write
 
 jobs:
   check-release:
