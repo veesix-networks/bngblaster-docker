@@ -1,0 +1,82 @@
+name: build-bngblaster
+
+on:
+  schedule:
+    - cron: "0 6 * * *"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "BNG Blaster version to build (e.g. 0.9.30)"
+        required: true
+        type: string
+
+jobs:
+  check-release:
+    if: github.event_name == 'schedule'
+    runs-on: ubuntu-24.04
+    outputs:
+      new_version: ${{ steps.check.outputs.new_version }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Check for new upstream release
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          LATEST=$(gh api repos/rtbrick/bngblaster/releases/latest --jq '.tag_name')
+          echo "Latest upstream release: ${LATEST}"
+
+          if git rev-parse "v${LATEST}" >/dev/null 2>&1; then
+            echo "Tag v${LATEST} already exists, nothing to do"
+            echo "new_version=" >> "$GITHUB_OUTPUT"
+          else
+            echo "New version found: ${LATEST}"
+            echo "new_version=${LATEST}" >> "$GITHUB_OUTPUT"
+          fi
+
+  build-and-push:
+    needs: check-release
+    if: always() && (github.event_name == 'workflow_dispatch' || needs.check-release.outputs.new_version != '')
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${{ needs.check-release.outputs.new_version }}"
+          fi
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          push: true
+          build-args: |
+            BNGBLASTER_VERSION=${{ steps.version.outputs.version }}
+          tags: |
+            veesixnetworks/bngblaster:${{ steps.version.outputs.version }}
+            veesixnetworks/bngblaster:latest
+
+      - name: Create git tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
