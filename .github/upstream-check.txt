@@ -1,2 +1,2 @@
-last_checked: 2026-09-23T10:27:57Z
+last_checked: 2026-09-24T10:44:41Z
 upstream_latest: 0.9.39
