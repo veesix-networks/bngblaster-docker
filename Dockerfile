@@ -13,6 +13,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     ca-certificates \
     iproute2 \
     iputils-ping \
+    python3 \
     && curl -fsSL -o /tmp/bngblaster.deb \
         "https://github.com/rtbrick/bngblaster/releases/download/${BNGBLASTER_VERSION}/bngblaster-${BNGBLASTER_VERSION}-bookworm_amd64.deb" \
     && apt-get install -y --no-install-recommends /tmp/bngblaster.deb \
